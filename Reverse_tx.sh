@@ -20,44 +20,18 @@ function get_headers {
   echo "$cookie" "$token"
 }
 
-# Define the get_curl_command function
-function get_curl_command {
+# Define the execute_ussd_command function
+function execute_ussd_command {
   # Get the function arguments
-  local url=$1
-  local cookie=$2
-  local token=$3
-  # Return the curl command
-  echo "curl -X POST '$url' -H 'Cookie: $cookie' -H 'x-requested-with: XMLHttpRequest' -H '__RequestVerificationToken: $token'"
-}
-
-# Define the execute_curl_commands function
-function execute_curl_commands {
-  # Create a local variable to store the error message
-  local error_message=""
-  # Execute the curl commands
-  for curl_command in "$@"; do
-    # Check for errors in the curl command
-    if ! output=$(eval "$curl_command"); then
-      error_message="Failed to execute curl command: $curl_command"
-      break
-    fi
-  done
-  # Check if there was an error
-  if [ -n "$error_message" ]; then
-    echo "$error_message"
+  local ussd_command=$1
+  # Send the USSD command using curl and store the response
+  ussd_response=$(curl -X POST 'http://192.168.8.1/api/ussd/send' -H "Accept: text/plain" -H "Content-Type: application/json" -d "{\"MSISDN\": \"phoneNumber\", \"Message\": \"$ussd_command\"}" | jq -r '.Message')
+  # Check for errors in the USSD response
+  if [[ "$ussd_response" == *"Error"* ]]; then
+    echo "Failed to execute USSD command: $ussd_command"
     exit 1
   fi
-}
-
-# Define the try_curl_command function
-function try_curl_command {
-  # Get the function arguments
-  local curl_command=$1
-  # Try to execute the curl command
-  if ! output=$(curl -s "$curl_command"); then
-    error_message="Failed to execute curl command: $curl_command"
-    return 1
-  fi
+  echo "$ussd_response"
 }
 
 # Trap all errors and log them to the console
@@ -83,14 +57,25 @@ if [ $exitstatus = 1 ]; then
   exit 1
 fi
 
-# Define the curl commands based on the reverse transaction ID
-curl_commands=(
-  "curl -X GET 'http://192.168.8.1/api/wallet/transaction/$reverse_transaction_id'"
-  "curl -X POST 'http://192.168.8.1/api/wallet/transaction/reverse/$reverse_transaction_id'"
-)
+# Execute USSD commands to initiate transaction reversal
 
-# Execute the curl commands
-execute_curl_commands "${curl_commands[@]}"
+# Send the initial USSD command to enter the money transfer menu
+execute_ussd_command "*126#"
 
-# Trap all errors and log them to the console
-trap 'echo "Error: $?"' EXIT
+# Send the USSD command to select the option for sending money
+execute_ussd_command "7"
+
+# Send the USSD command to select the option for reversing transactions
+execute_ussd_command "6"
+
+# Send the USSD command to enter the reverse transaction ID
+execute_ussd_command "$reverse_transaction_id"
+
+# Send the USSD command to select the transaction to reverse
+execute_ussd_command "1"
+
+# Send the USSD command to enter the PIN number
+execute_ussd_command "*pin#"
+
+# Display the final USSD response
+echo "Transaction reversal completed."
